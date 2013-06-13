@@ -41,17 +41,17 @@ static int wcn36xx_start(struct ieee80211_hw *hw)
 
 	wcn36xx_dbg(WCN36XX_DBG_MAC, "mac start");
 
-	// SMD initialization
+	/* SMD initialization */
 	ret = wcn36xx_smd_open(wcn);
 	if (ret) {
 		wcn36xx_error("Failed to open smd channel: %d", ret);
 		goto out_err;
 	}
 
-	// Not to receive INT until the whole buf from SMD is read
+	/* Not to receive INT until the whole buf from SMD is read */
 	smd_disable_read_intr(wcn->smd_ch);
 
-	// Allocate memory pools for Mgmt BD headers and Data BD headers
+	/* Allocate memory pools for Mgmt BD headers and Data BD headers */
 	ret = wcn36xx_dxe_allocate_mem_pools(wcn);
 	if (ret) {
 		wcn36xx_error("Failed to alloc DXE mempool: %d", ret);
@@ -66,22 +66,15 @@ static int wcn36xx_start(struct ieee80211_hw *hw)
 
 	INIT_WORK(&wcn->rx_ready_work, wcn36xx_rx_ready_work);
 
-	ret = request_firmware(&wcn->nv, WLAN_NV_FILE, wcn->dev);
-	if (ret) {
-		wcn36xx_error("Failed to load nv file %s: %d", WLAN_NV_FILE,
-			      ret);
-		goto out_free_dxe_ctl;
-	}
-
-	// Maximum SMD message size is 4k
+	/* Maximum SMD message size is 4k */
 	wcn->smd_buf = kmalloc(4096, GFP_KERNEL);
 	if (!wcn->smd_buf) {
 		wcn36xx_error("Failed to allocate smd buf");
 		ret = -ENOMEM;
-		goto out_free_nv;
+		goto out_free_dxe_ctl;
 	}
 
-	//TODO pass configuration to FW
+	/* TODO pass configuration to FW */
 	ret = wcn36xx_smd_load_nv(wcn);
 	if (ret) {
 		wcn36xx_error("Failed to push NV to chip");
@@ -91,9 +84,9 @@ static int wcn36xx_start(struct ieee80211_hw *hw)
 	ret = wcn36xx_smd_start(wcn);
 	if (ret) {
 		wcn36xx_error("Failed to start chip");
-		goto out_free_nv;
+		goto out_free_smd_buf;
 	}
-	// DMA chanel initialization
+	/* DMA channel initialization */
 	ret = wcn36xx_dxe_init(wcn);
 	if (ret) {
 		wcn36xx_error("DXE init failed");
@@ -105,8 +98,6 @@ out_smd_stop:
 	wcn36xx_smd_stop(wcn);
 out_free_smd_buf:
 	kfree(wcn->smd_buf);
-out_free_nv:
-	release_firmware(wcn->nv);
 out_free_dxe_pool:
 	wcn36xx_dxe_free_mem_pools(wcn);
 out_free_dxe_ctl:
@@ -128,8 +119,6 @@ static void wcn36xx_stop(struct ieee80211_hw *hw)
 
 	wcn36xx_dxe_free_mem_pools(wcn);
 	wcn36xx_dxe_free_ctl_blks(wcn);
-
-	release_firmware(wcn->nv);
 
 	kfree(wcn->smd_buf);
 }
@@ -153,8 +142,8 @@ static int wcn36xx_config(struct ieee80211_hw *hw, u32 changed)
 	if (changed & IEEE80211_CONF_CHANGE_CHANNEL) {
 		wcn->ch = hw->conf.chandef.chan->hw_value;
 		wcn->current_channel = hw->conf.chandef.chan;
-		wcn36xx_info("wcn36xx_config channel switch=%d", wcn->ch);
-		wcn36xx_smd_switch_channel_req(wcn, wcn->ch);
+		wcn36xx_dbg(WCN36XX_DBG_MAC, "wcn36xx_config channel switch=%d", wcn->ch);
+		wcn36xx_smd_switch_channel(wcn, wcn->ch);
 	}
 
 	return 0;
@@ -176,10 +165,13 @@ static void wcn36xx_tx(struct ieee80211_hw *hw,
 		       struct ieee80211_tx_control *control,
 		       struct sk_buff *skb)
 {
+	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	struct ieee80211_mgmt *mgmt;
-	bool high, bcast;
+	bool high, bcast, tx_compl;
 	u32 header_len = 0;
+	struct wcn36xx *wcn = hw->priv;
 
+	tx_compl = info->flags & IEEE80211_TX_CTL_REQ_TX_STATUS;
 	mgmt = (struct ieee80211_mgmt *)skb->data;
 
 	high = !(ieee80211_is_data(mgmt->frame_control) ||
@@ -188,6 +180,12 @@ static void wcn36xx_tx(struct ieee80211_hw *hw,
 	bcast = is_broadcast_ether_addr(mgmt->da) ||
 		is_multicast_ether_addr(mgmt->da);
 
+	/*
+	 * In joining state trick hardware that probe is sent as unicast even
+	 * if address is broadcast.
+	 */
+	if (wcn->is_joining && ieee80211_is_probe_req(mgmt->frame_control))
+		bcast = false;
 	wcn36xx_dbg(WCN36XX_DBG_TX,
 		    "tx skb %p len %d fc %04x sn %d %s %s",
 		    skb, skb->len, __le16_to_cpu(mgmt->frame_control),
@@ -199,7 +197,7 @@ static void wcn36xx_tx(struct ieee80211_hw *hw,
 	header_len = ieee80211_is_data_qos(mgmt->frame_control) ?
 		sizeof(struct ieee80211_qos_hdr) :
 		sizeof(struct ieee80211_hdr_3addr);
-	wcn36xx_dxe_tx(hw->priv, skb, bcast, high, header_len);
+	wcn36xx_dxe_tx(hw->priv, skb, bcast, high, header_len, tx_compl);
 }
 
 static int wcn36xx_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
@@ -263,20 +261,18 @@ out:
 
 static void wcn36xx_sw_scan_start(struct ieee80211_hw *hw)
 {
-
 	struct wcn36xx *wcn = hw->priv;
 
 	wcn36xx_smd_init_scan(wcn);
 	wcn36xx_smd_start_scan(wcn, wcn->ch);
-	wcn->is_scanning = 1;
 }
 
 static void wcn36xx_sw_scan_complete(struct ieee80211_hw *hw)
 {
 	struct wcn36xx *wcn = hw->priv;
+
 	wcn36xx_smd_end_scan(wcn, wcn->ch);
 	wcn36xx_smd_finish_scan(wcn);
-	wcn->is_scanning = 0;
 }
 
 static void wcn36xx_bss_info_changed(struct ieee80211_hw *hw,
@@ -293,15 +289,18 @@ static void wcn36xx_bss_info_changed(struct ieee80211_hw *hw,
 	wcn36xx_dbg(WCN36XX_DBG_MAC, "mac bss info changed vif %p changed 0x%08x",
 		    vif, changed);
 
-	if(changed & BSS_CHANGED_BSSID) {
+	if (changed & BSS_CHANGED_BSSID) {
 		wcn36xx_dbg(WCN36XX_DBG_MAC, "mac bss changed_bssid %pM",
 			    bss_conf->bssid);
 
 		if (vif->type == NL80211_IFTYPE_STATION &&
 		    !is_zero_ether_addr(bss_conf->bssid)) {
-			wcn36xx_smd_join(wcn, bss_conf->bssid, vif->addr, wcn->ch);
+			wcn->is_joining = true;
+			wcn36xx_smd_join(wcn, bss_conf->bssid,
+					 vif->addr, wcn->ch);
 			wcn36xx_smd_config_bss(wcn, NL80211_IFTYPE_STATION,
-					       bss_conf->bssid, false);
+					       bss_conf->bssid, false,
+					       wcn->beacon_interval);
 		}
 	}
 
@@ -315,8 +314,17 @@ static void wcn36xx_bss_info_changed(struct ieee80211_hw *hw,
 		memcpy(&wcn->ssid.ssid, bss_conf->ssid, bss_conf->ssid_len);
 	}
 
+	if (changed & BSS_CHANGED_BEACON_INT) {
+		wcn36xx_dbg(WCN36XX_DBG_MAC,
+			    "mac bss changed beacon_int %d",
+			    bss_conf->beacon_int);
+
+		wcn->beacon_interval = bss_conf->beacon_int;
+	}
+
 	if (changed & BSS_CHANGED_ASSOC) {
-		if(bss_conf->assoc) {
+		wcn->is_joining = false;
+		if (bss_conf->assoc) {
 			wcn36xx_dbg(WCN36XX_DBG_MAC,
 				    "mac assoc bss %pM vif %pM AID=%d",
 				     bss_conf->bssid,
@@ -331,7 +339,7 @@ static void wcn36xx_bss_info_changed(struct ieee80211_hw *hw,
 						WCN36XX_HAL_LINK_POSTASSOC_STATE);
 			wcn36xx_smd_config_bss(wcn, NL80211_IFTYPE_STATION,
 					       bss_conf->bssid,
-					       true);
+					       true, wcn->beacon_interval);
 			wcn36xx_smd_config_sta(wcn, bss_conf->bssid, vif->addr);
 
 		} else {
@@ -353,7 +361,11 @@ static void wcn36xx_bss_info_changed(struct ieee80211_hw *hw,
 	if (changed & BSS_CHANGED_AP_PROBE_RESP) {
 		wcn36xx_dbg(WCN36XX_DBG_MAC, "mac bss changed ap probe resp");
 		skb = ieee80211_proberesp_get(hw, vif);
-		wcn36xx_smd_update_proberesp_tmpl(wcn, skb);
+		if (skb) {
+			wcn36xx_smd_update_proberesp_tmpl(wcn, skb);
+			dev_kfree_skb(skb);
+		} else
+			wcn36xx_error("failed to alloc probereq skb");
 	}
 
 	if (changed & BSS_CHANGED_BEACON_ENABLED) {
@@ -363,12 +375,19 @@ static void wcn36xx_bss_info_changed(struct ieee80211_hw *hw,
 
 		if (bss_conf->enable_beacon) {
 			wcn->beacon_enable = true;
-			skb = ieee80211_beacon_get_tim(hw, vif, &tim_off, &tim_len);
 			wcn36xx_smd_config_bss(wcn, wcn->iftype,
-					       wcn->addresses[0].addr, false);
-			wcn36xx_smd_send_beacon(wcn, skb, tim_off, 0);
+					       wcn->addresses[0].addr, false,
+					       wcn->beacon_interval);
+			skb = ieee80211_beacon_get_tim(hw, vif, &tim_off,
+						       &tim_len);
+			if (skb) {
+				wcn36xx_smd_send_beacon(wcn, skb, tim_off, 0);
+				dev_kfree_skb(skb);
+			} else
+				wcn36xx_error("failed to alloc beacon skb");
 
-			if (vif->type == NL80211_IFTYPE_ADHOC)
+			if (vif->type == NL80211_IFTYPE_ADHOC ||
+			    vif->type == NL80211_IFTYPE_MESH_POINT)
 				link_state = WCN36XX_HAL_LINK_IBSS_STATE;
 			else
 				link_state = WCN36XX_HAL_LINK_AP_STATE;
@@ -412,6 +431,7 @@ static int wcn36xx_add_interface(struct ieee80211_hw *hw,
 		wcn36xx_smd_add_sta_self(wcn, vif->addr, 0);
 		break;
 	case NL80211_IFTYPE_ADHOC:
+	case NL80211_IFTYPE_MESH_POINT:
 		wcn36xx_smd_add_sta_self(wcn, vif->addr, 0);
 		break;
 	default:
@@ -428,45 +448,49 @@ static int wcn36xx_add_interface(struct ieee80211_hw *hw,
 static int wcn36xx_sta_add(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 			   struct ieee80211_sta *sta)
 {
- 	struct wcn36xx *wcn = hw->priv;
+	struct wcn36xx *wcn = hw->priv;
 
- 	wcn36xx_dbg(WCN36XX_DBG_MAC, "mac sta add vif %p sta %pM",
+	wcn36xx_dbg(WCN36XX_DBG_MAC, "mac sta add vif %p sta %pM",
 		    vif, sta->addr);
 
-	if (vif->type == NL80211_IFTYPE_ADHOC)
+	if (vif->type == NL80211_IFTYPE_ADHOC ||
+	    vif->type == NL80211_IFTYPE_AP ||
+	    vif->type == NL80211_IFTYPE_MESH_POINT)
 		wcn36xx_smd_config_sta(wcn, wcn->addresses[0].addr,
 				       sta->addr);
 
- 	return 0;
+	return 0;
 }
 
-static int wcn36xx_sta_remove(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
+static int wcn36xx_sta_remove(struct ieee80211_hw *hw,
+			      struct ieee80211_vif *vif,
 			      struct ieee80211_sta *sta)
 {
- 	struct wcn36xx *wcn = hw->priv;
+	struct wcn36xx *wcn = hw->priv;
 
- 	wcn36xx_dbg(WCN36XX_DBG_MAC, "mac sta remove vif %p sta %pM",
+	wcn36xx_dbg(WCN36XX_DBG_MAC, "mac sta remove vif %p sta %pM",
 		    vif, sta->addr);
 
-	if (vif->type == NL80211_IFTYPE_ADHOC)
+	if (vif->type == NL80211_IFTYPE_ADHOC ||
+	    vif->type == NL80211_IFTYPE_MESH_POINT)
 		wcn36xx_smd_delete_sta(wcn);
 
 	return 0;
 }
 
 static const struct ieee80211_ops wcn36xx_ops = {
-	.start 			= wcn36xx_start,
-	.stop	 		= wcn36xx_stop,
+	.start			= wcn36xx_start,
+	.stop			= wcn36xx_stop,
 	.add_interface		= wcn36xx_add_interface,
-	.remove_interface 	= wcn36xx_remove_interface,
-	.change_interface 	= wcn36xx_change_interface,
-	.config 		= wcn36xx_config,
-	.configure_filter 	= wcn36xx_configure_filter,
-	.tx 			= wcn36xx_tx,
+	.remove_interface	= wcn36xx_remove_interface,
+	.change_interface	= wcn36xx_change_interface,
+	.config			= wcn36xx_config,
+	.configure_filter	= wcn36xx_configure_filter,
+	.tx			= wcn36xx_tx,
 	.set_key		= wcn36xx_set_key,
-	.sw_scan_start          = wcn36xx_sw_scan_start,
-	.sw_scan_complete       = wcn36xx_sw_scan_complete,
-	.bss_info_changed 	= wcn36xx_bss_info_changed,
+	.sw_scan_start		= wcn36xx_sw_scan_start,
+	.sw_scan_complete	= wcn36xx_sw_scan_complete,
+	.bss_info_changed	= wcn36xx_bss_info_changed,
 	.set_rts_threshold	= wcn36xx_set_rts_threshold,
 	.sta_add		= wcn36xx_sta_add,
 	.sta_remove		= wcn36xx_sta_remove,
@@ -572,10 +596,10 @@ static struct ieee80211_rate wcn_5ghz_rates[] = {
 };
 
 static struct ieee80211_supported_band wcn_band_2ghz = {
-	.channels 	= wcn_2ghz_channels,
-	.n_channels 	= ARRAY_SIZE(wcn_2ghz_channels),
-	.bitrates 	= wcn_legacy_rates,
-	.n_bitrates 	= ARRAY_SIZE(wcn_legacy_rates),
+	.channels	= wcn_2ghz_channels,
+	.n_channels	= ARRAY_SIZE(wcn_2ghz_channels),
+	.bitrates	= wcn_legacy_rates,
+	.n_bitrates	= ARRAY_SIZE(wcn_legacy_rates),
 	.ht_cap		= {
 		.cap = IEEE80211_HT_CAP_GRN_FLD | IEEE80211_HT_CAP_SGI_20 |
 			(1 << IEEE80211_HT_CAP_RX_STBC_SHIFT),
@@ -591,10 +615,10 @@ static struct ieee80211_supported_band wcn_band_2ghz = {
 };
 
 static struct ieee80211_supported_band wcn_band_5ghz = {
-	.channels 	= wcn_5ghz_channels,
-	.n_channels 	= ARRAY_SIZE(wcn_5ghz_channels),
-	.bitrates 	= wcn_5ghz_rates,
-	.n_bitrates 	= ARRAY_SIZE(wcn_5ghz_rates),
+	.channels	= wcn_5ghz_channels,
+	.n_channels	= ARRAY_SIZE(wcn_5ghz_channels),
+	.bitrates	= wcn_5ghz_rates,
+	.n_bitrates	= ARRAY_SIZE(wcn_5ghz_rates),
 	.ht_cap		= {
 		.cap = IEEE80211_HT_CAP_GRN_FLD
 			| IEEE80211_HT_CAP_SGI_20
@@ -635,11 +659,13 @@ static int wcn36xx_init_ieee80211(struct wcn36xx *wcn)
 	};
 
 	wcn->hw->flags = IEEE80211_HW_SIGNAL_DBM |
-		IEEE80211_HW_HAS_RATE_CONTROL;
+		IEEE80211_HW_HAS_RATE_CONTROL |
+		IEEE80211_HW_REPORTS_TX_ACK_STATUS;
 
 	wcn->hw->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION) |
 		BIT(NL80211_IFTYPE_AP) |
-		BIT(NL80211_IFTYPE_ADHOC);
+		BIT(NL80211_IFTYPE_ADHOC) |
+		BIT(NL80211_IFTYPE_MESH_POINT);
 
 	wcn->hw->wiphy->iface_combinations = &if_comb;
 	wcn->hw->wiphy->n_iface_combinations = 1;
@@ -652,7 +678,8 @@ static int wcn36xx_init_ieee80211(struct wcn36xx *wcn)
 	wcn->hw->wiphy->cipher_suites = cipher_suites;
 	wcn->hw->wiphy->n_cipher_suites = ARRAY_SIZE(cipher_suites);
 
-	// TODO make a conf file where to read this information from
+	wcn->hw->wiphy->flags |= WIPHY_FLAG_AP_PROBE_RESP_OFFLOAD;
+	/* TODO make a conf file where to read this information from */
 	wcn->hw->max_listen_interval = 200;
 
 	wcn->hw->queues = 4;
@@ -671,25 +698,26 @@ static int wcn36xx_read_mac_addresses(struct wcn36xx *wcn)
 	const struct firmware *addr_file = NULL;
 	int status;
 	u8 tmp[18];
-	static const u8 qcom_oui[3] = {0x00, 0xA0, 0xC6};
+	static const u8 qcom_oui[3] = {0x00, 0x0A, 0xF5};
 	static const char *files[1] = {MAC_ADDR_0};
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(wcn->addresses); i++) {
-		if (i > ARRAY_SIZE(files) - 1) {
+		if (i > ARRAY_SIZE(files) - 1)
 			status = -1;
-		} else {
-			status = request_firmware(&addr_file, files[i], wcn->dev);
-		}
+		else
+			status = request_firmware(&addr_file, files[i],
+						  wcn->dev);
 
 		if (status) {
-			wcn36xx_warn("Failed to read macaddress file %s, using a random address instead",
-				     files[i]);
 			if (i == 0) {
-				/* Assign a random mac address with Qualcomm oui */
+				/* Assign a random mac with Qualcomm oui */
+				wcn36xx_warn("Failed to read macaddress file %s, using a random address instead",
+					     files[i]);
 				memcpy(wcn->addresses[i].addr, qcom_oui, 3);
 				get_random_bytes(wcn->addresses[i].addr + 3, 3);
 			} else {
+				wcn36xx_warn("Failed to read macaddress file, using a random address instead");
 				/* Assign locally administered mac addresses to
 				 * all but the first mac */
 				memcpy(wcn->addresses[i].addr,
@@ -741,23 +769,16 @@ static int __init wcn36xx_init(void)
 		goto out_err;
 	}
 
-	wcn->wq = create_freezable_workqueue("wcn36xx_wq");
+	wcn->wq = create_workqueue("wcn36xx_wq");
 	if (!wcn->wq) {
 		wcn36xx_error("failed to allocate wq");
 		ret = -ENOMEM;
 		goto out_err;
 	}
 
-	wcn->ctl_wq = create_freezable_workqueue("wcn36xx_ctl_wq");
-	if (!wcn->ctl_wq) {
-		wcn36xx_error("failed to allocate ctl wq");
-		ret = -ENOMEM;
-		goto out_wq;
-	}
-
 	wcn36xx_init_ieee80211(wcn);
 
-	// Configuring supported rates
+	/* Configuring supported rates */
 	wcn->supported_rates.op_rate_mode = STA_11n;
 	wcn->supported_rates.llb_rates[0] = 0x82;
 	wcn->supported_rates.llb_rates[1] = 0x84;
@@ -777,6 +798,7 @@ static int __init wcn36xx_init(void)
 
 	wcn->aid = 0;
 	wcn->current_vif = NULL;
+	wcn->is_joining = false;
 	wcn->hw->wiphy->n_addresses = ARRAY_SIZE(wcn->addresses);
 	wcn->hw->wiphy->addresses = wcn->addresses;
 
@@ -784,7 +806,7 @@ static int __init wcn36xx_init(void)
 	if (wcnss_memory == NULL) {
 		wcn36xx_error("failed to get wcnss wlan memory map");
 		ret = -ENOMEM;
-		goto out_wq_ctl;
+		goto out_wq;
 	}
 
 	wcn->tx_irq = wcnss_wlan_get_dxe_tx_irq(wcn->dev);
@@ -794,25 +816,32 @@ static int __init wcn36xx_init(void)
 	if (NULL == wcn->mmio) {
 		wcn36xx_error("failed to map io memory");
 		ret = -ENOMEM;
-		goto out_wq_ctl;
+		goto out_wq;
 	}
 
 	private_hw = hw;
 	wcn->beacon_enable = false;
+
+	ret = request_firmware(&wcn->nv, WLAN_NV_FILE, wcn->dev);
+	if (ret) {
+		wcn36xx_error("Failed to load nv file %s: %d", WLAN_NV_FILE,
+			      ret);
+		goto out_unmap;
+	}
 
 	wcn36xx_read_mac_addresses(wcn);
 	SET_IEEE80211_PERM_ADDR(wcn->hw, wcn->addresses[0].addr);
 
 	ret = ieee80211_register_hw(wcn->hw);
 	if (ret)
-		goto out_unmap;
+		goto out_free_nv;
 
 	return 0;
 
+out_free_nv:
+	release_firmware(wcn->nv);
 out_unmap:
 	iounmap(wcn->mmio);
-out_wq_ctl:
-	destroy_workqueue(wcn->ctl_wq);
 out_wq:
 	destroy_workqueue(wcn->wq);
 out_err:
@@ -827,9 +856,9 @@ static void __exit wcn36xx_exit(void)
 	struct wcn36xx *wcn = hw->priv;
 
 	ieee80211_unregister_hw(hw);
-	destroy_workqueue(wcn->ctl_wq);
 	destroy_workqueue(wcn->wq);
 	iounmap(wcn->mmio);
+	release_firmware(wcn->nv);
 	ieee80211_free_hw(hw);
 }
 module_exit(wcn36xx_exit);

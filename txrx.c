@@ -23,7 +23,7 @@ int wcn36xx_rx_skb(struct wcn36xx *wcn, struct sk_buff *skb)
 {
 	struct ieee80211_rx_status status;
 	struct ieee80211_hdr *hdr;
-	struct wcn36xx_rx_bd * bd;
+	struct wcn36xx_rx_bd *bd;
 	u16 fc, sn;
 	/*
 	 * All fields must be 0, otherwise it can lead to
@@ -32,7 +32,7 @@ int wcn36xx_rx_skb(struct wcn36xx *wcn, struct sk_buff *skb)
 	memset(&status, 0, sizeof(status));
 
 	bd = (struct wcn36xx_rx_bd *)skb->data;
-	buff_to_be((u32*)bd, sizeof(*bd)/sizeof(u32));
+	buff_to_be((u32 *)bd, sizeof(*bd)/sizeof(u32));
 
 	skb_put(skb, bd->pdu.mpdu_header_off + bd->pdu.mpdu_len);
 	skb_pull(skb, bd->pdu.mpdu_header_off);
@@ -47,7 +47,7 @@ int wcn36xx_rx_skb(struct wcn36xx *wcn, struct sk_buff *skb)
 	status.rx_flags = 0;
 	status.flag |= RX_FLAG_IV_STRIPPED |
 		       RX_FLAG_MMIC_STRIPPED |
-		       RX_FLAG_DECRYPTED ;
+		       RX_FLAG_DECRYPTED;
 	wcn36xx_dbg(WCN36XX_DBG_RX, "status.flags=%x "
 		    "status->vendor_radiotap_len=%x",
 		    status.flag,  status.vendor_radiotap_len);
@@ -61,61 +61,66 @@ int wcn36xx_rx_skb(struct wcn36xx *wcn, struct sk_buff *skb)
 	if (ieee80211_is_beacon(hdr->frame_control)) {
 		wcn36xx_dbg(WCN36XX_DBG_BEACON, "beacon skb %p len %d fc %04x sn %d",
 			    skb, skb->len, fc, sn);
+		wcn36xx_dbg_dump(WCN36XX_DBG_BEACON_DUMP, "SKB <<< ",
+				 (char *)skb->data, skb->len);
 	} else {
 		wcn36xx_dbg(WCN36XX_DBG_RX, "rx skb %p len %d fc %04x sn %d",
 			    skb, skb->len, fc, sn);
+		wcn36xx_dbg_dump(WCN36XX_DBG_RX_DUMP, "SKB <<< ",
+				 (char *)skb->data, skb->len);
 	}
-
-	wcn36xx_dbg_dump(WCN36XX_DBG_RX_DUMP, "SKB <<< ",
-			 (char *)skb->data, skb->len);
 
 	ieee80211_rx_ni(wcn->hw, skb);
 
 	return 0;
 }
-void wcn36xx_prepare_tx_bd(void *pBd, u32 len, u32 header_len)
+void wcn36xx_prepare_tx_bd(struct wcn36xx_tx_bd *bd, u32 len, u32 header_len)
 {
-	struct wcn36xx_tx_bd * bd = (struct wcn36xx_tx_bd *)pBd;
-	// Must be clean every time because we can have some leftovers from the previous packet
-	memset(pBd, 0, (sizeof(struct wcn36xx_tx_bd)));
+	memset(bd, 0, sizeof(*bd));
 	bd->pdu.mpdu_header_len = header_len;
-	bd->pdu.mpdu_header_off = sizeof(struct wcn36xx_tx_bd);
+	bd->pdu.mpdu_header_off = sizeof(*bd);
 	bd->pdu.mpdu_data_off = bd->pdu.mpdu_header_len +
 		bd->pdu.mpdu_header_off;
 	bd->pdu.mpdu_len = len;
 }
-void wcn36xx_fill_tx_bd(struct wcn36xx *wcn,
-			void *pBd,
-			u8 broadcast,
-			u8 encrypt)
+void wcn36xx_fill_tx_bd(struct wcn36xx *wcn, struct wcn36xx_tx_bd *bd,
+			u8 broadcast, u8 encrypt, struct ieee80211_hdr *hdr,
+			bool tx_compl)
 {
-	struct wcn36xx_tx_bd * bd = (struct wcn36xx_tx_bd *)pBd;
 	bd->dpu_rf = WCN36XX_BMU_WQ_TX;
 	bd->pdu.tid   = WCN36XX_TID;
 	bd->pdu.reserved3 = 0xd;
 
-	if ( broadcast ) {
-		// broadcast
+	if (broadcast) {
+		/* broadcast */
 		bd->ub = 1;
 		bd->queue_id = WCN36XX_TX_B_WQ_ID;
 
-		// default rate for broadcast
+		/* default rate for broadcast */
 		bd->bd_rate = 0;
 
-		// No ack needed not unicast
+		/* No ack needed not unicast */
 		bd->ack_policy = 1;
 	} else {
 		bd->queue_id = WCN36XX_TX_U_WQ_ID;
-		// default rate for unicast
-		bd->bd_rate = 2;
+		/* default rate for unicast */
 		bd->ack_policy = 0;
+		if (ieee80211_is_data(hdr->frame_control))
+			bd->bd_rate = WCN36XX_BD_RATE_DATA;
+		else if (ieee80211_is_mgmt(hdr->frame_control))
+			bd->bd_rate = WCN36XX_BD_RATE_MGMT;
+		else if (ieee80211_is_ctl(hdr->frame_control))
+			bd->bd_rate = WCN36XX_BD_RATE_CTRL;
+		else
+			wcn36xx_warn("frame control type unknown");
 	}
 
 	bd->sta_index = wcn->current_vif->sta_index;
 	bd->dpu_desc_idx = wcn->current_vif->dpu_desc_index;
 
 	bd->dpu_ne = encrypt;
+	bd->tx_comp = tx_compl;
 
-	buff_to_be((u32*)bd, sizeof(*bd)/sizeof(u32));
+	buff_to_be((u32 *)bd, sizeof(*bd)/sizeof(u32));
 	bd->tx_bd_sign = 0xbdbdbdbd;
 }
