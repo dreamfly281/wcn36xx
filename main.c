@@ -356,6 +356,7 @@ static void wcn36xx_bss_info_changed(struct ieee80211_hw *hw,
 					       bss_conf->bssid,
 					       true, wcn->beacon_interval);
 			wcn36xx_smd_config_sta(wcn, bss_conf->bssid, vif->addr);
+			wcn36xx_smd_enter_bmps(wcn, bss_conf->sync_tsf);
 
 		} else {
 			wcn36xx_dbg(WCN36XX_DBG_MAC,
