@@ -2950,7 +2950,7 @@ struct wcn36xx_hal_exit_bmps_req_msg {
 
 	u8 send_data_null;
 	u8 bss_index;
-};
+}__packed;
 
 struct wcn36xx_hal_missed_beacon_ind_msg {
 	struct wcn36xx_hal_msg_header header;
