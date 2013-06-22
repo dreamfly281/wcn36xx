@@ -92,6 +92,9 @@ static int wcn36xx_start(struct ieee80211_hw *hw)
 		wcn36xx_error("DXE init failed");
 		goto out_smd_stop;
 	}
+
+	wcn36xx_pmu_init(wcn);
+	wcn36xx_debugfs_init(wcn);
 	return 0;
 
 out_smd_stop:
@@ -113,6 +116,7 @@ static void wcn36xx_stop(struct ieee80211_hw *hw)
 
 	wcn36xx_dbg(WCN36XX_DBG_MAC, "mac stop");
 
+	wcn36xx_debugfs_exit(wcn);
 	wcn36xx_smd_stop(wcn);
 	wcn36xx_dxe_deinit(wcn);
 	wcn36xx_smd_close(wcn);
@@ -356,8 +360,6 @@ static void wcn36xx_bss_info_changed(struct ieee80211_hw *hw,
 					       bss_conf->bssid,
 					       true, wcn->beacon_interval);
 			wcn36xx_smd_config_sta(wcn, bss_conf->bssid, vif->addr);
-			wcn36xx_smd_enter_bmps(wcn, bss_conf->sync_tsf);
-
 		} else {
 			wcn36xx_dbg(WCN36XX_DBG_MAC,
 				    "disassociated bss %pM vif %pM AID=%d",
@@ -675,8 +677,7 @@ static int wcn36xx_init_ieee80211(struct wcn36xx *wcn)
 	};
 
 	wcn->hw->flags = IEEE80211_HW_SIGNAL_DBM |
-		IEEE80211_HW_HAS_RATE_CONTROL |
-		IEEE80211_HW_REPORTS_TX_ACK_STATUS;
+		IEEE80211_HW_HAS_RATE_CONTROL;
 
 	wcn->hw->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION) |
 		BIT(NL80211_IFTYPE_AP) |

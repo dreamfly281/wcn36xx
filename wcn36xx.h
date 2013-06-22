@@ -28,6 +28,8 @@
 #include "smd.h"
 #include "dxe.h"
 #include "hal.h"
+#include "pmc.h"
+#include "debug.h"
 
 #define DRIVER_PREFIX "wcn36xx: "
 #define WLAN_NV_FILE               "wlan/prima/WCNSS_qcom_wlan_nv.bin"
@@ -159,6 +161,12 @@ struct wcn36xx {
 	struct wcn36xx_dxe_mem_pool data_mem_pool;
 
 	struct sk_buff		*tx_ack_skb;
+
+	/* Power management */
+	enum wcn36xx_power_state     pw_state;
+
+	/* Debug file system entry */
+	struct wcn36xx_dfs_entry     dfs;
 };
 
 #endif	/* _WCN36XX_H_ */
