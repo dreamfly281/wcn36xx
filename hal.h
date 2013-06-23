@@ -4226,7 +4226,7 @@ struct set_power_params_resp {
 
 	/* status of the request */
 	u32 status;
-};
+}__packed;
 
 /* Capability bitmap exchange definitions and macros starts */
 
@@ -4262,7 +4262,7 @@ struct wlan_feat_caps_msg {
 	struct wcn36xx_hal_msg_header header;
 
 	u32 feat_caps[4];
-};
+}__packed;
 
 /* status codes to help debug rekey failures */
 enum gtk_rekey_status {

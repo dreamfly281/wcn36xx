@@ -95,6 +95,11 @@ static int wcn36xx_start(struct ieee80211_hw *hw)
 
 	wcn36xx_pmu_init(wcn);
 	wcn36xx_debugfs_init(wcn);
+	ret = wcn36xx_smd_feature_caps_exchange_req(wcn);
+	if (ret) {
+		wcn36xx_warn("Exchange feature caps failed");
+	}
+
 	return 0;
 
 out_smd_stop:

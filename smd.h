@@ -91,6 +91,7 @@ int wcn36xx_smd_remove_bsskey(struct wcn36xx *wcn,
 			      u8 keyidx);
 int wcn36xx_smd_enter_bmps(struct wcn36xx *wcn, u64 tbtt);
 int wcn36xx_smd_exit_bmps(struct wcn36xx *wcn);
+int wcn36xx_smd_feature_caps_exchange_req(struct wcn36xx *wcn);
 
 /* WCN36XX configuration parameters */
 struct wcn36xx_fw_cfg {
