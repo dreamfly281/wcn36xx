@@ -1030,8 +1030,8 @@ int wcn36xx_smd_enter_bmps(struct wcn36xx *wcn, u64 tbtt)
 
 	msg_body.bss_index = 0;
 	msg_body.tbtt = tbtt;
-	msg_body.dtim_count = 0;
-	msg_body.dtim_period = 1;
+	msg_body.dtim_count = 1;
+	msg_body.dtim_period = 2;
 
 	msg_body.rssi_filter_period = 0;
 	msg_body.num_beacon_per_rssi_average = 0;

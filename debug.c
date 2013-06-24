@@ -64,7 +64,7 @@ static ssize_t write_file_bool_bmps(struct file *file,
 	case 'Y':
 	case '1':
 		/* Fixme the TBTT value */
-		wcn36xx_pmc_enter_bmps_state(wcn, 1024);
+		wcn36xx_pmc_enter_bmps_state(wcn, 102400);
 		break;
 	case 'n':
 	case 'N':
