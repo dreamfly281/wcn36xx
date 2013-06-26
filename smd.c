@@ -1022,6 +1022,42 @@ int wcn36xx_smd_remove_bsskey(struct wcn36xx *wcn,
 	return wcn36xx_smd_send_and_wait(wcn, msg_body.header.len);
 }
 
+/* eid, check_ie_presence, offset, vale, mask, ref */
+static struct beacon_filter_ie bcn_filter_ies[] = {
+	{WLAN_EID_DS_PARAMS,		0, 0, 0, 0x00, 0},
+	{WLAN_EID_ERP_INFO,		0, 0, 0, 0xf8, 0},
+	{WLAN_EID_EDCA_PARAM_SET,	0, 0, 0, 0xf0, 0},
+	{WLAN_EID_QOS_CAPA,		0, 0, 0, 0xf0, 0},
+	{WLAN_EID_CHANNEL_SWITCH,	1, 0, 0, 0x00, 0},
+	{WLAN_EID_HT_OPERATION,		0, 0, 0, 0x00, 0},
+	{WLAN_EID_HT_OPERATION,		0, 2, 0, 0xeb, 0},
+	{WLAN_EID_HT_OPERATION,		0, 5, 0, 0xfd, 0},
+	{WLAN_EID_OPMODE_NOTIF,		0, 0, 0, 0x00, 0}
+};
+
+int wcn36xx_smd_enable_bcn_filter(struct wcn36xx *wcn)
+{
+	struct wcn36xx_hal_add_bcn_filter_req_msg msg_body, *body;
+
+	INIT_HAL_MSG(msg_body, WCN36XX_HAL_ADD_BCN_FILTER_REQ);
+
+	msg_body.capability_info = wcn->capabilities_info;
+	msg_body.capability_mask = 0x73CF;
+	msg_body.beacon_interval = wcn->beacon_interval;
+	msg_body.ie_num = ARRAY_SIZE(bcn_filter_ies);
+	msg_body.bss_index = 0;
+
+	PREPARE_HAL_BUF(wcn->smd_buf, msg_body);
+
+	memcpy(wcn->smd_buf + sizeof(msg_body), bcn_filter_ies,
+	       sizeof(bcn_filter_ies));
+	body = (struct wcn36xx_hal_add_bcn_filter_req_msg *) wcn->smd_buf;
+	body->header.len += sizeof(bcn_filter_ies);
+
+	return wcn36xx_smd_send_and_wait(wcn, body->header.len);
+}
+
+
 int wcn36xx_smd_enter_bmps(struct wcn36xx *wcn, u64 tbtt)
 {
 	struct wcn36xx_hal_enter_bmps_req_msg msg_body;
@@ -1197,6 +1233,7 @@ static void wcn36xx_smd_rsp_process(struct wcn36xx *wcn, void *buf, size_t len)
 	case WCN36XX_HAL_RMV_BSSKEY_RSP:
 	case WCN36XX_HAL_ENTER_BMPS_RSP:
 	case WCN36XX_HAL_EXIT_BMPS_RSP:
+	case WCN36XX_HAL_ADD_BCN_FILTER_RSP:
 		if (wcn36xx_smd_rsp_status_check(buf, len)) {
 			wcn36xx_warn("error response from hal request %d",
 				     msg_header->msg_type);
