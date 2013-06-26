@@ -28,11 +28,12 @@ int wcn36xx_pmu_init(struct wcn36xx *wcn)
 
 int wcn36xx_pmc_enter_bmps_state(struct wcn36xx *wcn, u64 tbtt)
 {
+	u64 tsf = wcn->vif->bss_conf.sync_tsf;
 	/* TODO: Check the TX&RX status */
 	/* Disable the TX queue */
 	ieee80211_stop_queue(wcn->hw, 0);
 	/* Enter the BMPS mode */
-	wcn36xx_smd_enter_bmps(wcn, tbtt);
+	wcn36xx_smd_enter_bmps(wcn, tsf);
 	/* Set the enter BMPS status */
 	wcn->pw_state = WCN36XX_BMPS;
 	return 0;

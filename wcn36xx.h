@@ -116,6 +116,7 @@ struct wcn36xx {
 	enum nl80211_iftype	iftype;
 	u16			aid;
 	struct wcn36xx_vif	*current_vif;
+	struct ieee80211_vif	*vif; /* For debug get the tsf info */
 	u16			beacon_interval;
 	u16			capabilities_info;
 

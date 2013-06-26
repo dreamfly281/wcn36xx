@@ -308,6 +308,8 @@ static void wcn36xx_bss_info_changed(struct ieee80211_hw *hw,
 	struct sk_buff *skb = NULL;
 	u16 tim_off, tim_len;
 	enum wcn36xx_hal_link_state link_state;
+
+	wcn->vif = vif;
 	wcn->current_vif = (struct wcn36xx_vif *)vif->drv_priv;
 
 	wcn36xx_dbg(WCN36XX_DBG_MAC, "mac bss info changed vif %p changed 0x%08x",
@@ -685,7 +687,12 @@ static int wcn36xx_init_ieee80211(struct wcn36xx *wcn)
 	};
 
 	wcn->hw->flags = IEEE80211_HW_SIGNAL_DBM |
-		IEEE80211_HW_HAS_RATE_CONTROL;
+		IEEE80211_HW_HAS_RATE_CONTROL |
+		IEEE80211_HW_SUPPORTS_PS |
+		IEEE80211_HW_PS_NULLFUNC_STACK |
+		IEEE80211_HW_SUPPORTS_DYNAMIC_PS |
+		IEEE80211_HW_CONNECTION_MONITOR |
+		IEEE80211_HW_TIMING_BEACON_ONLY;
 
 	wcn->hw->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION) |
 		BIT(NL80211_IFTYPE_AP) |
@@ -823,6 +830,7 @@ static int __init wcn36xx_init(void)
 
 	wcn->aid = 0;
 	wcn->current_vif = NULL;
+	wcn->vif = NULL;
 	wcn->is_joining = false;
 	wcn->hw->wiphy->n_addresses = ARRAY_SIZE(wcn->addresses);
 	wcn->hw->wiphy->addresses = wcn->addresses;
