@@ -31,5 +31,5 @@ enum wcn36xx_power_state {
 int wcn36xx_pmu_init(struct wcn36xx *wcn);
 int wcn36xx_pmc_enter_bmps_state(struct wcn36xx *wcn, u64 tbtt);
 int wcn36xx_pmc_exit_bmps_state(struct wcn36xx *wcn);
-
+int wcn36xx_enable_keep_alive_null_packet(struct wcn36xx *wcn);
 #endif	/* _WCN36XX_PMC_H_ */

@@ -49,3 +49,16 @@ int wcn36xx_pmc_exit_bmps_state(struct wcn36xx *wcn)
 	ieee80211_wake_queue(wcn->hw, 0);
 	return 0;
 }
+
+
+int wcn36xx_enable_keep_alive_null_packet(struct wcn36xx *wcn)
+{
+	return wcn36xx_smd_keep_alive_req(wcn, WCN36XX_HAL_KEEP_ALIVE_NULL_PKT);
+}
+
+
+int wcn36xx_enable_keep_alive_arp_rsp(struct wcn36xx *wcn)
+{
+	/* TODO */
+	return 0;
+}
