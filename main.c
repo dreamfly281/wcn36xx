@@ -287,6 +287,8 @@ static void wcn36xx_sw_scan_start(struct ieee80211_hw *hw)
 {
 	struct wcn36xx *wcn = hw->priv;
 
+	wcn36xx_dbg(WCN36XX_DBG_MAC, "%s", __func__);
+
 	wcn36xx_smd_init_scan(wcn);
 	wcn36xx_smd_start_scan(wcn, wcn->ch);
 }
@@ -295,6 +297,7 @@ static void wcn36xx_sw_scan_complete(struct ieee80211_hw *hw)
 {
 	struct wcn36xx *wcn = hw->priv;
 
+	wcn36xx_dbg(WCN36XX_DBG_MAC, "%s", __func__);
 	wcn36xx_smd_end_scan(wcn, wcn->ch);
 	wcn36xx_smd_finish_scan(wcn);
 }
@@ -308,6 +311,8 @@ static void wcn36xx_bss_info_changed(struct ieee80211_hw *hw,
 	struct sk_buff *skb = NULL;
 	u16 tim_off, tim_len;
 	enum wcn36xx_hal_link_state link_state;
+
+	wcn36xx_dbg(WCN36XX_DBG_MAC, "%s", __func__);
 
 	wcn->vif = vif;
 	wcn->current_vif = (struct wcn36xx_vif *)vif->drv_priv;
