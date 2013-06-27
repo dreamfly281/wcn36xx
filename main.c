@@ -788,6 +788,8 @@ static int __init wcn36xx_init(void)
 	struct resource *wcnss_memory;
 	int ret;
 
+	wcn36xx_dbg(WCN36XX_DBG_MAC, "%s", __func__);
+
 	hw = wcn36xx_alloc_hw();
 	if (!hw) {
 		wcn36xx_error("failed to alloc hw");
@@ -891,6 +893,8 @@ static void __exit wcn36xx_exit(void)
 {
 	struct ieee80211_hw *hw = private_hw;
 	struct wcn36xx *wcn = hw->priv;
+
+	wcn36xx_dbg(WCN36XX_DBG_MAC, "%s", __func__);
 
 	ieee80211_unregister_hw(hw);
 	destroy_workqueue(wcn->wq);
