@@ -1082,7 +1082,7 @@ int wcn36xx_smd_exit_bmps(struct wcn36xx *wcn)
 {
 	struct wcn36xx_hal_exit_bmps_req_msg msg_body;
 
-	INIT_HAL_MSG(msg_body, WCN36XX_HAL_ENTER_BMPS_REQ);
+	INIT_HAL_MSG(msg_body, WCN36XX_HAL_EXIT_BMPS_REQ);
 
 	msg_body.bss_index = 0;
 	msg_body.send_data_null = 1;
