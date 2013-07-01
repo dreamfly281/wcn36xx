@@ -26,9 +26,8 @@ int wcn36xx_pmu_init(struct wcn36xx *wcn)
 	return 0;
 }
 
-int wcn36xx_pmc_enter_bmps_state(struct wcn36xx *wcn, u64 tbtt)
+int wcn36xx_pmc_enter_bmps_state(struct wcn36xx *wcn, u64 tsf)
 {
-	u64 tsf = wcn->vif->bss_conf.sync_tsf;
 	/* TODO: Check the TX&RX status */
 	/* Disable the TX queue */
 	ieee80211_stop_queue(wcn->hw, 0);

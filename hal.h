@@ -3044,7 +3044,7 @@ struct wcn36xx_hal_host_offload_req_msg {
 /* Enable or disable keep alive */
 #define WCN36XX_HAL_KEEP_ALIVE_DISABLE   0
 #define WCN36XX_HAL_KEEP_ALIVE_ENABLE    1
-#define WCN36XX_KEEP_ALIVE_TIME_PERIOD   2000000 /* unit: us */
+#define WCN36XX_KEEP_ALIVE_TIME_PERIOD   20 /* unit: us */
 
 /* Keep Alive request. */
 struct wcn36xx_hal_keep_alive_req_msg {

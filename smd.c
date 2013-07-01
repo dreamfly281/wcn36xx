@@ -1091,7 +1091,9 @@ int wcn36xx_smd_exit_bmps(struct wcn36xx *wcn)
 	return wcn36xx_smd_send_and_wait(wcn, msg_body.header.len);
 }
 
-
+/* Notice: This function should be called after associated, or else it
+ * will be invalid
+ */
 int wcn36xx_smd_keep_alive_req(struct wcn36xx *wcn, int packet_type)
 {
 	struct wcn36xx_hal_keep_alive_req_msg msg_body;
