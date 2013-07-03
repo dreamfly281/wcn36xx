@@ -3598,11 +3598,11 @@ struct wcn36xx_hal_configure_apps_cpu_wakeup_state_rsp_msg {
 struct wcn36xx_hal_dump_cmd_req_msg {
 	struct wcn36xx_hal_msg_header header;
 
-	u32 argument1;
-	u32 argument2;
-	u32 argument3;
-	u32 argument4;
-	u32 argument5;
+	u32 arg1;
+	u32 arg2;
+	u32 arg3;
+	u32 arg4;
+	u32 arg5;
 };
 
 struct wcn36xx_hal_dump_cmd_rsp_msg {

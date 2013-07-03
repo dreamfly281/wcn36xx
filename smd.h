@@ -94,6 +94,9 @@ int wcn36xx_smd_exit_bmps(struct wcn36xx *wcn);
 int wcn36xx_smd_feature_caps_exchange_req(struct wcn36xx *wcn);
 int wcn36xx_smd_enable_bcn_filter(struct wcn36xx *wcn);
 int wcn36xx_smd_keep_alive_req(struct wcn36xx *wcn, int packet_type);
+int wcn36xx_smd_dump_cmd_req(struct wcn36xx *wcn, u32 arg1, u32 arg2,
+			     u32 arg3, u32 arg4, u32 arg5);
+
 
 /* WCN36XX configuration parameters */
 struct wcn36xx_fw_cfg {
