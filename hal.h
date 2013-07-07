@@ -3056,7 +3056,7 @@ struct wcn36xx_hal_keep_alive_req_msg {
 	u8 dest_ipv4_addr[WCN36XX_HAL_IPV4_ADDR_LEN];
 	u8 dest_addr[ETH_ALEN];
 	u8 bss_index;
-};
+} __packed;
 
 struct wcn36xx_hal_rssi_threshold_req_msg {
 	struct wcn36xx_hal_msg_header header;
