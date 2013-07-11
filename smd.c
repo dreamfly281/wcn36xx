@@ -1047,7 +1047,7 @@ int wcn36xx_smd_enter_bmps(struct wcn36xx *wcn, u64 tbtt)
 
 	msg_body.bss_index = 0;
 	msg_body.tbtt = tbtt;
-	msg_body.dtim_period = wcn->dtim_period;
+	msg_body.dtim_period = 2;
 
 	PREPARE_HAL_BUF(wcn->smd_buf, msg_body);
 

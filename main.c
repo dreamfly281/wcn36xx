@@ -507,13 +507,13 @@ static void wcn36xx_bss_info_changed(struct ieee80211_hw *hw,
 		wcn->beacon_interval = bss_conf->beacon_int;
 	}
 
-	if (changed & BSS_CHANGED_BEACON_INFO) {
-		wcn36xx_dbg(WCN36XX_DBG_MAC,
-			    "mac bss changed dtim period %d",
-			    bss_conf->dtim_period);
+	/* if (changed & BSS_CHANGED_BEACON_INFO) { */
+	/* 	wcn36xx_dbg(WCN36XX_DBG_MAC, */
+	/* 		    "mac bss changed dtim period %d", */
+	/* 		    bss_conf->dtim_period); */
 
-		wcn->dtim_period = bss_conf->dtim_period;
-	}
+	/* 	wcn->dtim_period = bss_conf->dtim_period; */
+	/* } */
 
 	if (changed & BSS_CHANGED_BSSID) {
 		wcn36xx_dbg(WCN36XX_DBG_MAC, "mac bss changed_bssid %pM",
@@ -817,7 +817,7 @@ static int wcn36xx_init_ieee80211(struct wcn36xx *wcn)
 	wcn->hw->wiphy->flags |= WIPHY_FLAG_AP_PROBE_RESP_OFFLOAD;
 
 #ifdef CONFIG_PM
-	wcn->hw->wiphy->wowlan = &wowlan_support;
+	//wcn->hw->wiphy->wowlan = &wowlan_support;
 #endif
 
 	/* TODO make a conf file where to read this information from */
