@@ -36,7 +36,7 @@ static ssize_t read_file_bool_bmps(struct file *file, char __user *user_buf,
 	struct wcn36xx *wcn = file->private_data;
 	char buf[3];
 
-	if (wcn->pw_state == WCN36XX_BMPS)
+	if (wcn->pw_state & WCN36XX_BMPS_MODE)
 		buf[0] = '1';
 	else
 		buf[0] = '0';
@@ -50,9 +50,7 @@ static ssize_t write_file_bool_bmps(struct file *file,
 				    size_t count, loff_t *ppos)
 {
 	struct wcn36xx *wcn = file->private_data;
-	struct ieee80211_vif *vif = container_of((void *)wcn->current_vif,
-						 struct ieee80211_vif,
-						 drv_priv);
+
 	char buf[32];
 	int buf_size;
 
@@ -64,8 +62,7 @@ static ssize_t write_file_bool_bmps(struct file *file,
 	case 'y':
 	case 'Y':
 	case '1':
-		wcn36xx_enable_keep_alive_null_packet(wcn);
-		wcn36xx_pmc_enter_bmps_state(wcn, vif->bss_conf.sync_tsf);
+		wcn36xx_pmc_enter_bmps_state(wcn);
 		break;
 	case 'n':
 	case 'N':

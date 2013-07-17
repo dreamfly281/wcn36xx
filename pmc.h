@@ -23,14 +23,19 @@
 
 struct wcn36xx;
 
-enum wcn36xx_power_state {
-	WCN36XX_FULL_POWER,
-	WCN36XX_BMPS
-};
+#define WCN36XX_FULL_POWER	1
+#define WCN36XX_BMPS_MODE	2
+
+
+#define BMPS_MEASURE_TIMER_DEFAULT  5000 /* unit = ms */
 
 int wcn36xx_pmc_init(struct wcn36xx *wcn);
-int wcn36xx_pmc_enter_bmps_state(struct wcn36xx *wcn, u64 tbtt);
+int wcn36xx_pmc_deinit(struct wcn36xx *wcn);
+
+int wcn36xx_pmc_enter_bmps_state(struct wcn36xx *wcn);
 int wcn36xx_pmc_exit_bmps_state(struct wcn36xx *wcn);
-int wcn36xx_enable_keep_alive_null_packet(struct wcn36xx *wcn);
-int wcn36xx_enable_keep_alive_null_packet(struct wcn36xx *wcn);
+
+void wcn36xx_vote_enter_full_power(struct wcn36xx *wcn);
+void wcn36xx_vote_enter_bmps(struct wcn36xx *wcn);
+
 #endif	/* _WCN36XX_PMC_H_ */

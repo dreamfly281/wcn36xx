@@ -1070,7 +1070,8 @@ int wcn36xx_smd_exit_bmps(struct wcn36xx *wcn)
 /* Notice: This function should be called after associated, or else it
  * will be invalid
  */
-int wcn36xx_smd_keep_alive_req(struct wcn36xx *wcn, int packet_type)
+int wcn36xx_smd_keep_alive_req(struct wcn36xx *wcn, int packet_type,
+			       u32 time_period)
 {
 	struct wcn36xx_hal_keep_alive_req_msg msg_body;
 
@@ -1079,9 +1080,9 @@ int wcn36xx_smd_keep_alive_req(struct wcn36xx *wcn, int packet_type)
 	if (packet_type == WCN36XX_HAL_KEEP_ALIVE_NULL_PKT) {
 		msg_body.bss_index = 0;
 		msg_body.packet_type = WCN36XX_HAL_KEEP_ALIVE_NULL_PKT;
-		msg_body.time_period = WCN36XX_KEEP_ALIVE_TIME_PERIOD;
+		msg_body.time_period = time_period;
 	} else if (packet_type == WCN36XX_HAL_KEEP_ALIVE_UNSOLICIT_ARP_RSP) {
-		/* TODO: it also support ARP response type */
+		/* TODO: it also support send ARP response type */
 	} else {
 		wcn36xx_warn("unknow keep alive packet type %d", packet_type);
 		return -1;

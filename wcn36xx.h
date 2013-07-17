@@ -175,7 +175,9 @@ struct wcn36xx {
 	struct sk_buff		*tx_ack_skb;
 
 	/* Power management */
-	enum wcn36xx_power_state     pw_state;
+	int			     pw_state;
+	atomic_t		     full_power_cnt;
+	struct delayed_work	     bmps_work;
 
 	/* Debug file system entry */
 	struct wcn36xx_dfs_entry    dfs;
