@@ -270,6 +270,7 @@ static void wcn36xx_stop(struct ieee80211_hw *hw)
 	wcn36xx_dbg(WCN36XX_DBG_MAC, "mac stop");
 
 	wcn36xx_debugfs_exit(wcn);
+	wcn36xx_pmc_deinit(wcn);
 	wcn36xx_smd_stop(wcn);
 	wcn36xx_dxe_deinit(wcn);
 	wcn36xx_smd_close(wcn);
@@ -714,15 +715,11 @@ static int wcn36xx_sta_remove(struct ieee80211_hw *hw,
 static int wcn36xx_suspend(struct ieee80211_hw *hw, struct cfg80211_wowlan *wow)
 {
 	struct wcn36xx *wcn = hw->priv;
-	struct ieee80211_vif *vif = container_of((void *)wcn->current_vif,
-						 struct ieee80211_vif,
-						 drv_priv);
+
 	wcn36xx_dbg(WCN36XX_DBG_MAC, "mac suspend");
 
 	mutex_lock(&wcn->pm_mutex);
-	/* Enter BMPS only in connected state */
-	if ((wcn->aid > 0) && (wcn->pw_state != WCN36XX_BMPS))
-		wcn36xx_pmc_enter_bmps_state(wcn, vif->bss_conf.sync_tsf);
+	wcn36xx_pmc_enter_bmps_state(wcn);
 	wcn->is_suspended = true;
 	wcn->is_con_lost_pending = false;
 
@@ -741,9 +738,6 @@ static int wcn36xx_resume(struct ieee80211_hw *hw)
 	wcn36xx_dbg(WCN36XX_DBG_MAC, "mac resume");
 
 	wcn->is_suspended = false;
-	if (wcn->pw_state == WCN36XX_BMPS)
-		wcn36xx_pmc_exit_bmps_state(wcn);
-
 	if (wcn->is_con_lost_pending) {
 		wcn36xx_dbg(WCN36XX_DBG_MAC, "report connection lost");
 		ieee80211_connection_loss(vif);
