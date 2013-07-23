@@ -167,6 +167,7 @@ static struct ieee80211_supported_band wcn_band_5ghz = {
 static const struct ieee80211_iface_limit if_limits[] = {
 	{ .max = 2, .types = BIT(NL80211_IFTYPE_STATION) },
 	{ .max = 1, .types = BIT(NL80211_IFTYPE_AP) },
+        { .max = 1, .types = BIT(NL80211_IFTYPE_P2P_DEVICE) },
 };
 
 static const struct ieee80211_iface_combination if_comb = {
@@ -665,6 +666,10 @@ static int wcn36xx_add_interface(struct ieee80211_hw *hw,
 	case NL80211_IFTYPE_MESH_POINT:
 		wcn36xx_smd_add_sta_self(wcn, vif->addr, 0);
 		break;
+	case NL80211_IFTYPE_P2P_DEVICE:
+		/* TODO what the status 1 exactly mean? */
+		wcn36xx_smd_add_sta_self(wcn, vif->addr, 1);
+		break;
 	default:
 		wcn36xx_warn("Unsupported interface type requested: %d",
 			     vif->type);
@@ -686,7 +691,8 @@ static int wcn36xx_sta_add(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 
 	if (vif->type == NL80211_IFTYPE_ADHOC ||
 	    vif->type == NL80211_IFTYPE_AP ||
-	    vif->type == NL80211_IFTYPE_MESH_POINT) {
+	    vif->type == NL80211_IFTYPE_MESH_POINT ||
+	    vif->type == NL80211_IFTYPE_P2P_DEVICE) {
 		wcn->aid = sta->aid;
 		wcn36xx_smd_config_sta(wcn, wcn->addresses[0].addr,
 				       sta->addr);
@@ -705,7 +711,8 @@ static int wcn36xx_sta_remove(struct ieee80211_hw *hw,
 
 	if (vif->type == NL80211_IFTYPE_ADHOC ||
 	    vif->type == NL80211_IFTYPE_AP ||
-	    vif->type == NL80211_IFTYPE_MESH_POINT)
+	    vif->type == NL80211_IFTYPE_MESH_POINT ||
+	    vif->type == NL80211_IFTYPE_P2P_DEVICE)
 		wcn36xx_smd_delete_sta(wcn);
 
 	return 0;
@@ -795,7 +802,8 @@ static int wcn36xx_init_ieee80211(struct wcn36xx *wcn)
 	wcn->hw->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION) |
 		BIT(NL80211_IFTYPE_AP) |
 		BIT(NL80211_IFTYPE_ADHOC) |
-		BIT(NL80211_IFTYPE_MESH_POINT);
+		BIT(NL80211_IFTYPE_MESH_POINT) |
+		BIT(NL80211_IFTYPE_P2P_DEVICE);
 
 	wcn->hw->wiphy->iface_combinations = &if_comb;
 	wcn->hw->wiphy->n_iface_combinations = 1;
