@@ -179,6 +179,9 @@ struct wcn36xx {
 	atomic_t		     full_power_cnt;
 	struct delayed_work	     bmps_work;
 
+	/* P2P */
+	struct delayed_work	     roc_complete_work;
+
 	/* Debug file system entry */
 	struct wcn36xx_dfs_entry    dfs;
 };

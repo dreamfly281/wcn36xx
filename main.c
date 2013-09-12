@@ -17,6 +17,7 @@
 #include <linux/module.h>
 #include <linux/wcnss_wlan.h>
 #include "wcn36xx.h"
+#include "p2p.h"
 
 unsigned int debug_mask;
 module_param(debug_mask, uint, 0644);
@@ -243,6 +244,7 @@ static int wcn36xx_start(struct ieee80211_hw *hw)
 		goto out_smd_stop;
 	}
 	wcn36xx_pmc_init(wcn);
+	wcn36xx_p2p_init(wcn);
 	wcn36xx_debugfs_init(wcn);
 	ret = wcn36xx_smd_feature_caps_exchange(wcn);
 	if (ret) {
@@ -271,6 +273,7 @@ static void wcn36xx_stop(struct ieee80211_hw *hw)
 	wcn36xx_dbg(WCN36XX_DBG_MAC, "mac stop");
 
 	wcn36xx_debugfs_exit(wcn);
+	wcn36xx_p2p_deinit(wcn);
 	wcn36xx_pmc_deinit(wcn);
 	wcn36xx_smd_stop(wcn);
 	wcn36xx_dxe_deinit(wcn);
@@ -434,6 +437,7 @@ static void wcn36xx_sw_scan_start(struct ieee80211_hw *hw)
 {
 	struct wcn36xx *wcn = hw->priv;
 
+	wcn36xx_dbg(WCN36XX_DBG_MAC, "%s\n", __func__);
 	wcn36xx_smd_init_scan(wcn);
 	wcn36xx_smd_start_scan(wcn, wcn->ch);
 }
@@ -441,7 +445,7 @@ static void wcn36xx_sw_scan_start(struct ieee80211_hw *hw)
 static void wcn36xx_sw_scan_complete(struct ieee80211_hw *hw)
 {
 	struct wcn36xx *wcn = hw->priv;
-
+	wcn36xx_dbg(WCN36XX_DBG_MAC, "%s\n", __func__);
 	wcn36xx_smd_end_scan(wcn, wcn->ch);
 	wcn36xx_smd_finish_scan(wcn);
 }
@@ -718,6 +722,7 @@ static int wcn36xx_sta_remove(struct ieee80211_hw *hw,
 	return 0;
 }
 
+
 #ifdef CONFIG_PM
 static int wcn36xx_suspend(struct ieee80211_hw *hw, struct cfg80211_wowlan *wow)
 {
@@ -763,6 +768,8 @@ static const struct ieee80211_ops wcn36xx_ops = {
 	.suspend		= wcn36xx_suspend,
 	.resume			= wcn36xx_resume,
 #endif
+	.remain_on_channel	= wcn36xx_remain_on_channel,
+	.cancel_remain_on_channel = wcn36xx_cancel_remain_on_channel,
 	.change_interface	= wcn36xx_change_interface,
 	.config			= wcn36xx_config,
 	.configure_filter	= wcn36xx_configure_filter,
@@ -815,9 +822,11 @@ static int wcn36xx_init_ieee80211(struct wcn36xx *wcn)
 
 	wcn->hw->wiphy->cipher_suites = cipher_suites;
 	wcn->hw->wiphy->n_cipher_suites = ARRAY_SIZE(cipher_suites);
-
-	wcn->hw->wiphy->flags |= WIPHY_FLAG_AP_PROBE_RESP_OFFLOAD;
-
+	wcn->hw->wiphy->max_remain_on_channel_duration = 500;
+	wcn->hw->wiphy->flags |= WIPHY_FLAG_AP_PROBE_RESP_OFFLOAD |
+		WIPHY_FLAG_OFFCHAN_TX |
+		WIPHY_FLAG_HAS_REMAIN_ON_CHANNEL;
+	
 #ifdef CONFIG_PM
 	//wcn->hw->wiphy->wowlan = &wowlan_support;
 #endif
